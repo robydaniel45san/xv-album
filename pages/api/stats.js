@@ -3,14 +3,12 @@ import { google } from 'googleapis';
 const FOLDER_ID = process.env.FOLDER_ID;
 
 function getDriveService() {
-  const raw = process.env.GOOGLE_CREDENTIALS;
-  if (!raw) throw new Error('GOOGLE_CREDENTIALS no configurado');
-  const creds = JSON.parse(raw);
-  const auth = new google.auth.GoogleAuth({
-    credentials: creds,
-    scopes: ['https://www.googleapis.com/auth/drive.readonly'],
-  });
-  return google.drive({ version: 'v3', auth });
+  const oauth2 = new google.auth.OAuth2(
+    process.env.OAUTH_CLIENT_ID,
+    process.env.OAUTH_CLIENT_SECRET,
+  );
+  oauth2.setCredentials({ refresh_token: process.env.OAUTH_REFRESH_TOKEN });
+  return google.drive({ version: 'v3', auth: oauth2 });
 }
 
 export default async function handler(req, res) {

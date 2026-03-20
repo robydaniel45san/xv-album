@@ -14,8 +14,10 @@ const http       = require('http');
 const url        = require('url');
 
 // ── Pon aquí tus datos OAuth2 ──────────────────────────────
-const CLIENT_ID     = 'PEGA_TU_CLIENT_ID_AQUI';
-const CLIENT_SECRET = 'PEGA_TU_CLIENT_SECRET_AQUI';
+// Lee automáticamente desde .env.local
+require('dotenv').config({ path: '.env.local' });
+const CLIENT_ID     = process.env.OAUTH_CLIENT_ID;
+const CLIENT_SECRET = process.env.OAUTH_CLIENT_SECRET;
 // ──────────────────────────────────────────────────────────
 
 const REDIRECT = 'http://localhost:3333/callback';
