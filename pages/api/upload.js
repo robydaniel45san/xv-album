@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { Readable } from 'stream';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '15mb' } },
@@ -17,11 +18,16 @@ function getDriveService() {
 
 async function getOrCreateFolder(drive, parentId, name) {
   const safe = name.replace(/[<>:"/\\|?*]/g, '').trim().slice(0, 40);
+  if (!safe) return parentId;
+
   const res = await drive.files.list({
     q: `name='${safe}' and '${parentId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
     fields: 'files(id)',
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
   });
   if (res.data.files.length > 0) return res.data.files[0].id;
+
   const folder = await drive.files.create({
     requestBody: {
       name: safe,
@@ -29,6 +35,7 @@ async function getOrCreateFolder(drive, parentId, name) {
       parents: [parentId],
     },
     fields: 'id',
+    supportsAllDrives: true,
   });
   return folder.data.id;
 }
@@ -38,38 +45,51 @@ export default async function handler(req, res) {
 
   try {
     const { fileName, fileType, base64, guest } = req.body;
+
     if (!fileName || !base64)
       return res.status(400).json({ ok: false, error: 'Datos incompletos' });
 
-    const drive  = getDriveService();
-    const target = guest?.trim()
-      ? await getOrCreateFolder(drive, FOLDER_ID, guest.trim())
-      : FOLDER_ID;
+    const drive = getDriveService();
 
+    // Carpeta destino — si falla subfolder, sube a la carpeta raíz
+    let target = FOLDER_ID;
+    if (guest?.trim()) {
+      try {
+        target = await getOrCreateFolder(drive, FOLDER_ID, guest.trim());
+      } catch (folderErr) {
+        console.warn('[folder warn] usando carpeta raíz:', folderErr.message);
+        target = FOLDER_ID;
+      }
+    }
+
+    // Construir stream desde buffer
     const buffer   = Buffer.from(base64, 'base64');
     const mimeType = fileType || 'image/jpeg';
-
-    // Stream compatible con Vercel serverless
-    const { Readable } = require('stream');
-    const stream = new Readable();
+    const stream   = new Readable();
     stream.push(buffer);
     stream.push(null);
 
     const { data } = await drive.files.create({
       requestBody: {
-        name    : fileName,
-        parents : [target],
+        name:    fileName,
+        parents: [target],
       },
       media: {
         mimeType,
         body: stream,
       },
       fields: 'id, name',
+      supportsAllDrives: true,
     });
 
     res.json({ ok: true, id: data.id, name: data.name });
+
   } catch (e) {
-    console.error('[upload error]', e.message);
-    res.status(500).json({ ok: false, error: e.message });
+    console.error('[upload error]', e.message, e?.response?.data);
+    res.status(500).json({
+      ok:      false,
+      error:   e.message,
+      details: e?.response?.data || null,
+    });
   }
 }

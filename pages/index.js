@@ -6,10 +6,11 @@ const MAXPX   = 1920;
 const QUALITY = 0.82;
 
 function compressImage(file) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
     const url = URL.createObjectURL(file);
-    img.onload = () => {
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('No se pudo cargar la imagen')); };
+    img.onload  = () => {
       let { width: w, height: h } = img;
       if (w > MAXPX || h > MAXPX) {
         if (w > h) { h = Math.round(h * MAXPX / w); w = MAXPX; }
@@ -18,10 +19,12 @@ function compressImage(file) {
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      const outType = (file.type === 'image/png') ? 'image/png' : 'image/jpeg';
       canvas.toBlob((blob) => {
         URL.revokeObjectURL(url);
-        resolve(blob);
-      }, file.type === 'image/png' ? 'image/png' : 'image/jpeg', QUALITY);
+        if (!blob) reject(new Error('No se pudo comprimir la imagen'));
+        else resolve(blob);
+      }, outType, QUALITY);
     };
     img.src = url;
   });
@@ -96,9 +99,12 @@ export default function Home() {
           }),
         });
         const data = await res.json();
+        const errMsg = data.error
+          ? `${data.error}${data.details ? ' — ' + JSON.stringify(data.details) : ''}`
+          : null;
 
         setFiles(prev => prev.map((f, idx) =>
-          idx === i ? { ...f, status: data.ok ? 'ok' : 'error', error: data.error || null } : f
+          idx === i ? { ...f, status: data.ok ? 'ok' : 'error', error: errMsg } : f
         ));
       } catch (err) {
         setFiles(prev => prev.map((f, idx) =>
