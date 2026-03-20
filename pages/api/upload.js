@@ -8,14 +8,12 @@ export const config = {
 const FOLDER_ID = process.env.FOLDER_ID;
 
 function getDriveService() {
-  const raw = process.env.GOOGLE_CREDENTIALS;
-  if (!raw) throw new Error('GOOGLE_CREDENTIALS no configurado');
-  const creds = JSON.parse(raw);
-  const auth = new google.auth.GoogleAuth({
-    credentials: creds,
-    scopes: ['https://www.googleapis.com/auth/drive'],
-  });
-  return google.drive({ version: 'v3', auth });
+  const oauth2 = new google.auth.OAuth2(
+    process.env.OAUTH_CLIENT_ID,
+    process.env.OAUTH_CLIENT_SECRET,
+  );
+  oauth2.setCredentials({ refresh_token: process.env.OAUTH_REFRESH_TOKEN });
+  return google.drive({ version: 'v3', auth: oauth2 });
 }
 
 async function getOrCreateFolder(drive, parentId, name) {
@@ -41,15 +39,16 @@ export default async function handler(req, res) {
 
   try {
     const { fileName, fileType, base64, guest } = req.body;
-    if (!fileName || !base64) return res.status(400).json({ ok: false, error: 'Datos incompletos' });
+    if (!fileName || !base64)
+      return res.status(400).json({ ok: false, error: 'Datos incompletos' });
 
-    const drive   = getDriveService();
-    const target  = guest?.trim()
+    const drive  = getDriveService();
+    const target = guest?.trim()
       ? await getOrCreateFolder(drive, FOLDER_ID, guest.trim())
       : FOLDER_ID;
 
-    const buffer  = Buffer.from(base64, 'base64');
-    const stream  = Readable.from(buffer);
+    const buffer = Buffer.from(base64, 'base64');
+    const stream = Readable.from(buffer);
 
     const uploaded = await drive.files.create({
       requestBody: { name: fileName, parents: [target] },
@@ -59,7 +58,7 @@ export default async function handler(req, res) {
 
     res.json({ ok: true, id: uploaded.data.id, name: uploaded.data.name });
   } catch (e) {
-    console.error(e);
+    console.error('[upload error]', e.message);
     res.status(500).json({ ok: false, error: e.message });
   }
 }
