@@ -1,4 +1,5 @@
 import { google } from 'googleapis';
+import { NextResponse } from 'next/server';
 
 const FOLDER_ID = process.env.FOLDER_ID;
 
@@ -11,7 +12,7 @@ function getDriveService() {
   return google.drive({ version: 'v3', auth: oauth2 });
 }
 
-export default async function handler(req, res) {
+export async function GET() {
   try {
     const drive = getDriveService();
     const r = await drive.files.list({
@@ -19,8 +20,8 @@ export default async function handler(req, res) {
       fields: 'files(id)',
       pageSize: 1000,
     });
-    res.json({ ok: true, total: r.data.files.length });
+    return NextResponse.json({ ok: true, total: r.data.files.length });
   } catch (e) {
-    res.json({ ok: false, total: 0 });
+    return NextResponse.json({ ok: false, total: 0 });
   }
 }

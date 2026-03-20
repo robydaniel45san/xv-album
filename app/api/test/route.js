@@ -1,7 +1,8 @@
 import { google } from 'googleapis';
 import { Readable } from 'stream';
+import { NextResponse } from 'next/server';
 
-export default async function handler(req, res) {
+export async function GET() {
   const info = {
     vars: {
       FOLDER_ID:     process.env.FOLDER_ID          ? '✅' : '❌ missing',
@@ -32,7 +33,6 @@ export default async function handler(req, res) {
     info.step2_folder = `✅ accesible (${list.data.files.length} archivos)`;
 
     // ── 3. Intentar subir archivo de prueba ───────────────
-    // PNG 1x1 pixel (67 bytes)
     const testBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
     const buffer = Buffer.from(testBase64, 'base64');
 
@@ -65,5 +65,5 @@ export default async function handler(req, res) {
     info.ERROR_STEP    = 'ver campo ERROR arriba';
   }
 
-  res.json(info);
+  return NextResponse.json(info);
 }

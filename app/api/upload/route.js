@@ -1,9 +1,6 @@
 import { google } from 'googleapis';
 import { Readable } from 'stream';
-
-export const config = {
-  api: { bodyParser: { sizeLimit: '15mb' } },
-};
+import { NextResponse } from 'next/server';
 
 const FOLDER_ID = process.env.FOLDER_ID;
 
@@ -40,14 +37,12 @@ async function getOrCreateFolder(drive, parentId, name) {
   return folder.data.id;
 }
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ ok: false });
-
+export async function POST(request) {
   try {
-    const { fileName, fileType, base64, guest } = req.body;
+    const { fileName, fileType, base64, guest } = await request.json();
 
     if (!fileName || !base64)
-      return res.status(400).json({ ok: false, error: 'Datos incompletos' });
+      return NextResponse.json({ ok: false, error: 'Datos incompletos' }, { status: 400 });
 
     const drive = getDriveService();
 
@@ -82,14 +77,16 @@ export default async function handler(req, res) {
       supportsAllDrives: true,
     });
 
-    res.json({ ok: true, id: data.id, name: data.name });
+    return NextResponse.json({ ok: true, id: data.id, name: data.name });
 
   } catch (e) {
     console.error('[upload error]', e.message, e?.response?.data);
-    res.status(500).json({
+    return NextResponse.json({
       ok:      false,
       error:   e.message,
       details: e?.response?.data || null,
-    });
+    }, { status: 500 });
   }
 }
+
+export const maxDuration = 60;

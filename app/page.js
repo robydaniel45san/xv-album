@@ -1,5 +1,6 @@
+'use client';
+
 import { useState, useRef, useCallback, useEffect } from 'react';
-import Head from 'next/head';
 
 const EVENT   = 'Mis XV Años · Yeili Arianne';
 const MAXPX   = 1920;
@@ -124,14 +125,6 @@ export default function Home() {
 
   return (
     <>
-      <Head>
-        <title>{EVENT} – Álbum de fotos</title>
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet" />
-      </Head>
-
       <style>{`
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
         body {
