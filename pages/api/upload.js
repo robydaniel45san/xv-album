@@ -46,9 +46,14 @@ export default async function handler(req, res) {
       ? await getOrCreateFolder(drive, FOLDER_ID, guest.trim())
       : FOLDER_ID;
 
-    // Convertir base64 a Buffer y subirlo usando uploadType=multipart
     const buffer   = Buffer.from(base64, 'base64');
     const mimeType = fileType || 'image/jpeg';
+
+    // Stream compatible con Vercel serverless
+    const { Readable } = require('stream');
+    const stream = new Readable();
+    stream.push(buffer);
+    stream.push(null);
 
     const { data } = await drive.files.create({
       requestBody: {
@@ -57,7 +62,7 @@ export default async function handler(req, res) {
       },
       media: {
         mimeType,
-        body: require('stream').Readable.from(buffer),
+        body: stream,
       },
       fields: 'id, name',
     });
