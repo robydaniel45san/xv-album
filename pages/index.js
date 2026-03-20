@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import Head from 'next/head';
 
 const EVENT   = 'Mis XV Años · Yeili Arianne';
@@ -37,11 +37,14 @@ function toBase64(blob) {
 }
 
 export default function Home() {
+  const [mounted,  setMounted]  = useState(false);
   const [guest,    setGuest]    = useState('');
   const [files,    setFiles]    = useState([]);   // { file, preview, status, error }
   const [uploading, setUploading] = useState(false);
   const [done,     setDone]     = useState(false);
   const [dragging, setDragging] = useState(false);
+
+  useEffect(() => setMounted(true), []);
   const inputRef = useRef();
 
   const addFiles = useCallback((newFiles) => {
@@ -110,6 +113,8 @@ export default function Home() {
 
   const allOk   = files.length > 0 && files.every(f => f.status === 'ok');
   const pending = files.filter(f => f.status === 'pending' || f.status === 'error').length;
+
+  if (!mounted) return null;
 
   return (
     <>

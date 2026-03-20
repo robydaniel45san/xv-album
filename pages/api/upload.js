@@ -1,5 +1,4 @@
 import { google } from 'googleapis';
-import { Readable } from 'stream';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '15mb' } },
@@ -47,16 +46,23 @@ export default async function handler(req, res) {
       ? await getOrCreateFolder(drive, FOLDER_ID, guest.trim())
       : FOLDER_ID;
 
-    const buffer = Buffer.from(base64, 'base64');
-    const stream = Readable.from(buffer);
+    // Convertir base64 a Buffer y subirlo usando uploadType=multipart
+    const buffer   = Buffer.from(base64, 'base64');
+    const mimeType = fileType || 'image/jpeg';
 
-    const uploaded = await drive.files.create({
-      requestBody: { name: fileName, parents: [target] },
-      media: { mimeType: fileType || 'image/jpeg', body: stream },
+    const { data } = await drive.files.create({
+      requestBody: {
+        name    : fileName,
+        parents : [target],
+      },
+      media: {
+        mimeType,
+        body: require('stream').Readable.from(buffer),
+      },
       fields: 'id, name',
     });
 
-    res.json({ ok: true, id: uploaded.data.id, name: uploaded.data.name });
+    res.json({ ok: true, id: data.id, name: data.name });
   } catch (e) {
     console.error('[upload error]', e.message);
     res.status(500).json({ ok: false, error: e.message });
