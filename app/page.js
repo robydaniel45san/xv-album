@@ -3,8 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
 const EVENT   = 'Mis XV Años · Yeili Arianne';
-const MAXPX   = 1920;
-const QUALITY = 0.82;
+const MAXPX   = 1280;
+const QUALITY = 0.72;
 
 function compressImage(file) {
   return new Promise((resolve, reject) => {
