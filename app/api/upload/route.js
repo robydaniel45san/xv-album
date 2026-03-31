@@ -1,16 +1,15 @@
 import { google } from 'googleapis';
-import { Readable } from 'stream';
 import { NextResponse } from 'next/server';
 
 const FOLDER_ID = process.env.FOLDER_ID;
 
-function getDriveService() {
+function getOAuth2Client() {
   const oauth2 = new google.auth.OAuth2(
     process.env.OAUTH_CLIENT_ID,
     process.env.OAUTH_CLIENT_SECRET,
   );
   oauth2.setCredentials({ refresh_token: process.env.OAUTH_REFRESH_TOKEN });
-  return google.drive({ version: 'v3', auth: oauth2 });
+  return oauth2;
 }
 
 async function getOrCreateFolder(drive, parentId, name) {
@@ -37,60 +36,58 @@ async function getOrCreateFolder(drive, parentId, name) {
   return folder.data.id;
 }
 
+// Devuelve una URL de subida resumible de Google Drive.
+// El cliente sube el archivo directamente a esa URL (sin pasar por Vercel).
 export async function POST(request) {
   try {
-    const form     = await request.formData();
-    const file     = form.get('file');
-    const fileName = form.get('fileName');
-    const guest    = form.get('guest') || '';
+    const { fileName, fileType, fileSize, guest } = await request.json();
 
-    if (!file || !fileName)
+    if (!fileName || !fileType)
       return NextResponse.json({ ok: false, error: 'Datos incompletos' }, { status: 400 });
 
-    const drive = getDriveService();
+    const auth  = getOAuth2Client();
+    const drive = google.drive({ version: 'v3', auth });
 
-    // Carpeta destino — si falla subfolder, sube a la carpeta raíz
+    // Obtener access token vigente
+    const { token: accessToken } = await auth.getAccessToken();
+
+    // Carpeta destino
     let target = FOLDER_ID;
-    if (guest.trim()) {
+    if (guest?.trim()) {
       try {
         target = await getOrCreateFolder(drive, FOLDER_ID, guest.trim());
-      } catch (folderErr) {
-        console.warn('[folder warn] usando carpeta raíz:', folderErr.message);
+      } catch {
         target = FOLDER_ID;
       }
     }
 
-    // Construir stream desde ArrayBuffer (sin base64 — evita el límite de 4.5 MB de Vercel)
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer      = Buffer.from(arrayBuffer);
-    const mimeType    = file.type || 'image/jpeg';
-    const stream      = new Readable();
-    stream.push(buffer);
-    stream.push(null);
+    // Iniciar sesión de subida resumible en Google Drive
+    const initRes = await fetch(
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=resumable&supportsAllDrives=true',
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'X-Upload-Content-Type': fileType,
+          ...(fileSize ? { 'X-Upload-Content-Length': String(fileSize) } : {}),
+        },
+        body: JSON.stringify({ name: fileName, parents: [target] }),
+      }
+    );
 
-    const { data } = await drive.files.create({
-      requestBody: {
-        name:    fileName,
-        parents: [target],
-      },
-      media: {
-        mimeType,
-        body: stream,
-      },
-      fields: 'id, name',
-      supportsAllDrives: true,
-    });
+    if (!initRes.ok) {
+      const detail = await initRes.text();
+      return NextResponse.json({ ok: false, error: 'No se pudo iniciar la subida', detail }, { status: 500 });
+    }
 
-    return NextResponse.json({ ok: true, id: data.id, name: data.name });
+    const uploadUrl = initRes.headers.get('location');
+    return NextResponse.json({ ok: true, uploadUrl });
 
   } catch (e) {
-    console.error('[upload error]', e.message, e?.response?.data);
-    return NextResponse.json({
-      ok:      false,
-      error:   e.message,
-      details: e?.response?.data || null,
-    }, { status: 500 });
+    console.error('[upload error]', e.message);
+    return NextResponse.json({ ok: false, error: e.message }, { status: 500 });
   }
 }
 
-export const maxDuration = 60;
+export const maxDuration = 30;
