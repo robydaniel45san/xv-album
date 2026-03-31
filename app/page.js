@@ -31,14 +31,6 @@ function compressImage(file) {
   });
 }
 
-function toBase64(blob) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload  = () => resolve(reader.result.split(',')[1]);
-    reader.onerror = reject;
-    reader.readAsDataURL(blob);
-  });
-}
 
 export default function Home() {
   const [mounted,  setMounted]  = useState(false);
@@ -87,17 +79,15 @@ export default function Home() {
 
       try {
         const compressed = await compressImage(files[i].file);
-        const base64     = await toBase64(compressed);
+
+        const form = new FormData();
+        form.append('file', compressed, files[i].file.name);
+        form.append('fileName', files[i].file.name);
+        form.append('guest', guest.trim());
 
         const res  = await fetch('/api/upload', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileName: files[i].file.name,
-            fileType: files[i].file.type,
-            base64,
-            guest: guest.trim() || null,
-          }),
+          body: form,
         });
         const data = await res.json();
         const errMsg = data.error

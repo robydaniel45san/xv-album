@@ -39,16 +39,19 @@ async function getOrCreateFolder(drive, parentId, name) {
 
 export async function POST(request) {
   try {
-    const { fileName, fileType, base64, guest } = await request.json();
+    const form     = await request.formData();
+    const file     = form.get('file');
+    const fileName = form.get('fileName');
+    const guest    = form.get('guest') || '';
 
-    if (!fileName || !base64)
+    if (!file || !fileName)
       return NextResponse.json({ ok: false, error: 'Datos incompletos' }, { status: 400 });
 
     const drive = getDriveService();
 
     // Carpeta destino — si falla subfolder, sube a la carpeta raíz
     let target = FOLDER_ID;
-    if (guest?.trim()) {
+    if (guest.trim()) {
       try {
         target = await getOrCreateFolder(drive, FOLDER_ID, guest.trim());
       } catch (folderErr) {
@@ -57,10 +60,11 @@ export async function POST(request) {
       }
     }
 
-    // Construir stream desde buffer
-    const buffer   = Buffer.from(base64, 'base64');
-    const mimeType = fileType || 'image/jpeg';
-    const stream   = new Readable();
+    // Construir stream desde ArrayBuffer (sin base64 — evita el límite de 4.5 MB de Vercel)
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer      = Buffer.from(arrayBuffer);
+    const mimeType    = file.type || 'image/jpeg';
+    const stream      = new Readable();
     stream.push(buffer);
     stream.push(null);
 
