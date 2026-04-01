@@ -80,27 +80,14 @@ export default function Home() {
       try {
         const compressed = await compressImage(files[i].file);
 
-        // Paso 1: pedir URL de subida al servidor (solo metadata, sin el archivo)
-        const metaRes = await fetch('/api/upload', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fileName: files[i].file.name,
-            fileType: compressed.type || 'image/jpeg',
-            fileSize: compressed.size,
-            guest: guest.trim() || null,
-          }),
-        });
-        const meta = await metaRes.json();
-        if (!meta.ok) throw new Error(meta.error || 'Error al obtener URL de subida');
+        const form = new FormData();
+        form.append('file', compressed, files[i].file.name);
+        form.append('fileName', files[i].file.name);
+        form.append('guest', guest.trim());
 
-        // Paso 2: subir el archivo directamente a Google Drive (sin pasar por Vercel)
-        const uploadRes = await fetch(meta.uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': compressed.type || 'image/jpeg' },
-          body: compressed,
-        });
-        if (!uploadRes.ok) throw new Error(`Error subiendo a Drive: ${uploadRes.status}`);
+        const res  = await fetch('/api/upload', { method: 'POST', body: form });
+        const data = await res.json();
+        if (!data.ok) throw new Error(data.error || 'Error al subir');
 
         setFiles(prev => prev.map((f, idx) =>
           idx === i ? { ...f, status: 'ok', error: null } : f
